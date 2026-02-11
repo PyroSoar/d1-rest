@@ -71,7 +71,21 @@ export default {
                 if (!query) {
                     return c.json({ error: 'Query is required' }, 400);
                 }
-
+                
+                // --- 防脱库逻辑开始 ---
+                // 如果是 SELECT *，必须带 WHERE 或 LIMIT
+                if (normalized.startsWith("SELECT *")) {
+                    const hasWhere = /WHERE/i.test(normalized);
+                    const hasLimit = /LIMIT/i.test(normalized);
+        
+                    if (!hasWhere && !hasLimit) {
+                        return c.json({
+                            error: "SELECT * without WHERE or LIMIT is not allowed."
+                        }, 400);
+                    }
+                }
+                // --- 防脱库逻辑结束 ---
+                
                 // Execute the query against D1 database
                 const results = await env.DB.prepare(query)
                     .bind(...(params || []))
