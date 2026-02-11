@@ -41,6 +41,10 @@ async function handleGet(c: Context<{ Bindings: Env }>, tableName: string, id?: 
             conditions.push(`${sanitizedKey} = ?`);
             params.push(value);
         }
+        // 如果没有任何条件，也没有分页限制，则直接拒绝
+        if (conditions.length === 0 && !searchParams.get('limit')) {
+            return c.json({ error: 'Full table scan is not allowed. Please provide filters or a limit.' }, 400);
+        }
 
         // Add WHERE clause if there are conditions
         if (conditions.length > 0) {
