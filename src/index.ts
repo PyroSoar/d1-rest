@@ -74,6 +74,7 @@ export default {
                 
                 // --- 防脱库逻辑开始 ---
                 // 如果是 SELECT *，必须带 WHERE 或 LIMIT
+                const normalized = query.trim().toUpperCase();
                 if (normalized.startsWith("SELECT *")) {
                     const hasWhere = /WHERE/i.test(normalized);
                     const hasLimit = /LIMIT/i.test(normalized);
