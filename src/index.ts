@@ -102,6 +102,11 @@ export default {
         };
 
         // CRUD REST endpoints made available to all of our tables
+        // Health check root
+        app.get('/', async (c) => {
+            return c.text('Database Working.', 200);
+        });
+
         app.all('/rest/*', authMiddleware, handleRest);
 
         // Execute a raw SQL statement with parameters with this route
