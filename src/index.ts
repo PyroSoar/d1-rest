@@ -1,7 +1,6 @@
 import { Hono, Context, Next } from "hono";
 import { cors } from "hono/cors";
 import { handleRest } from './rest';
-import crypto from 'crypto';
 
 export interface Env {
     DB: D1Database;
@@ -39,6 +38,21 @@ export default {
 
         // Secret Store key value that we have set
         const secret = await env.SECRET.get();
+
+        // Helper function to generate HMAC-SHA256 signature using Web Crypto API
+        const generateSignature = async (secretKey: string, message: string): Promise<string> => {
+            const encoder = new TextEncoder();
+            const key = await crypto.subtle.importKey(
+                'raw',
+                encoder.encode(secretKey),
+                { name: 'HMAC', hash: 'SHA-256' },
+                false,
+                ['sign']
+            );
+            const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(message));
+            const hashArray = Array.from(new Uint8Array(signature));
+            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        };
 
         // Authentication middleware that verifies encrypted Bearer token
         // Token format: salt:timestamp:signature
@@ -78,10 +92,7 @@ export default {
 
             // Verify signature using HMAC-SHA256
             const message = `${secret}:${timestamp}:${salt}`;
-            const expectedSignature = crypto
-                .createHmac('sha256', secret)
-                .update(message)
-                .digest('hex');
+            const expectedSignature = await generateSignature(secret, message);
 
             if (providedSignature !== expectedSignature) {
                 return c.json({ error: 'Unauthorized' }, 401);
