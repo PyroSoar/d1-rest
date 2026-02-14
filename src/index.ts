@@ -37,7 +37,10 @@ export default {
         })
 
         // Secret Store key value that we have set
-        const secret = await env.SECRET.get();
+        // The secret now holds a semicolon-separated list of allowed client hosts
+        // e.g. "lzc2002.top;localhost:4000"
+        const allowedHostsStr = await env.SECRET.get();
+        const allowedHosts = (allowedHostsStr || '').split(';').map(s => s.trim()).filter(Boolean);
 
         // Helper function to generate HMAC-SHA256 signature using Web Crypto API
         const generateSignature = async (secretKey: string, message: string): Promise<string> => {
@@ -90,11 +93,22 @@ export default {
                 return c.json({ error: 'Unauthorized' }, 401);
             }
 
-            // Verify signature using HMAC-SHA256
-            const message = `${secret}:${timestamp}:${salt}`;
-            const expectedSignature = await generateSignature(secret, message);
+            // Verify signature using HMAC-SHA256 against allowed hosts
+            if (allowedHosts.length === 0) {
+                return c.json({ error: 'Unauthorized' }, 401);
+            }
 
-            if (providedSignature !== expectedSignature) {
+            let matched = false;
+            for (const host of allowedHosts) {
+                const message = `${host}:${timestamp}:${salt}`;
+                const expectedSignature = await generateSignature(host, message);
+                if (providedSignature === expectedSignature) {
+                    matched = true;
+                    break;
+                }
+            }
+
+            if (!matched) {
                 return c.json({ error: 'Unauthorized' }, 401);
             }
 
