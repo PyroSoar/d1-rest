@@ -1,6 +1,7 @@
 import { Hono, Context, Next } from "hono";
 import { cors } from "hono/cors";
 import { handleRest } from './rest';
+import crypto from 'crypto';
 
 export interface Env {
     DB: D1Database;
@@ -39,9 +40,10 @@ export default {
         // Secret Store key value that we have set
         const secret = await env.SECRET.get();
 
-        // Authentication middleware that verifies the Authorization header
-        // is sent in on each request and matches the value of our Secret key.
-        // If a match is not found we return a 401 and prevent further access.
+        // Authentication middleware that verifies encrypted Bearer token
+        // Token format: salt:timestamp:signature
+        // signature = HMAC_SHA256(secret, secret:timestamp:salt)
+        // Timestamp must be within 1 minute of current time
         const authMiddleware = async (c: Context, next: Next) => {
             const authHeader = c.req.header('Authorization');
             if (!authHeader) {
@@ -52,7 +54,36 @@ export default {
                 ? authHeader.substring(7)
                 : authHeader;
 
-            if (token !== secret) {
+            // Parse token format: salt:timestamp:signature
+            const parts = token.split(':');
+            if (parts.length !== 3) {
+                return c.json({ error: 'Unauthorized' }, 401);
+            }
+
+            const [salt, timestampStr, providedSignature] = parts;
+
+            // Verify timestamp is within 1 minute
+            const timestamp = parseInt(timestampStr, 10);
+            if (isNaN(timestamp)) {
+                return c.json({ error: 'Unauthorized' }, 401);
+            }
+
+            const currentTime = Date.now();
+            const timeDiff = Math.abs(currentTime - timestamp);
+            const ONE_MINUTE = 60000;
+
+            if (timeDiff > ONE_MINUTE) {
+                return c.json({ error: 'Unauthorized' }, 401);
+            }
+
+            // Verify signature using HMAC-SHA256
+            const message = `${secret}:${timestamp}:${salt}`;
+            const expectedSignature = crypto
+                .createHmac('sha256', secret)
+                .update(message)
+                .digest('hex');
+
+            if (providedSignature !== expectedSignature) {
                 return c.json({ error: 'Unauthorized' }, 401);
             }
 
