@@ -118,7 +118,7 @@ export default {
         // CRUD REST endpoints made available to all of our tables
         // Health check root
         app.get('/', async (c) => {
-            return c.text('Database Working.', 200);
+            return c.json({ status: 200, message: 'Database is working.' }, 200);
         });
 
         app.all('/rest/*', authMiddleware, handleRest);
