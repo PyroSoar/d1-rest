@@ -84,9 +84,6 @@ async function handleGet(c: Context<{ Bindings: Env }>, tableName: string, id?: 
 /**
  * Handles POST requests to create new records
  */
-/**
- * Handles POST requests to create new records
- */
 async function handlePost(c: Context<{ Bindings: Env }>, tableName: string): Promise<Response> {
     const table = sanitizeKeyword(tableName);
     const data = await c.req.json();
@@ -112,11 +109,19 @@ async function handlePost(c: Context<{ Bindings: Env }>, tableName: string): Pro
         const query = `INSERT INTO ${table} (${columns.join(', ')}) VALUES (${placeholders})`;
         const params = columns.map(col => fullData[col]);
 
+        // 执行插入
         const result = await c.env.DB.prepare(query)
             .bind(...params)
             .run();
 
-        return c.json({ message: 'Resource created successfully', data: fullData }, 201);
+        // 返回插入成功的结果，附带 rowid
+        return c.json({
+            message: 'Resource created successfully',
+            data: {
+                ...fullData,
+                rowid: result.meta.last_row_id
+            }
+        }, 201);
     } catch (error: any) {
         return c.json({ error: error.message }, 500);
     }
